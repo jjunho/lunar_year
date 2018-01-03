@@ -1,25 +1,49 @@
 #! /usr/bin/python
 #encoding: utf-8
+"""
+module lunar.py
+
+Calculates the lunar year from a Gregorian year and
+displays the year's name in Chinese, Korean, Japanese,
+Vietnamese and English.
+
+Usage:
+
+python lunar.py [gregorian year] [language]
+
+[gregorian year] in numbers
+[language] as chi, kor, jap, viet, eng
+"""
 
 class LunarYear(object):
-    def __init__(self, year):
-        
+    """
+    Builds a Lunar Year table with the years' names in
+    Chinese, Korean, Japanese, Vietnamese and English.
+    """
+    def __init__(self, gregorian_year):
+        """
+        Instantiate the class with a Gregorian year
+        """
         # from wikipedia (http://en.wikipedia.org/wiki/Sexagenary_cycle)
-        a = int(year) - 3
-        b = a / 60
-        c = a - (60 * b)
-        c = str(c)
-        
-        self.solar_year = str(year)
-        self.year_in_cicle = c
-        self._table = self._get_year()
-    
+        self.solar_year = str(gregorian_year)
+        self.year_in_cicle = str(int(gregorian_year) - (60 * (int(gregorian_year) - 3) // 60))
+        self._table = LunarYear._get_year()
+
     def lang(self, lang):
+        """
+        Choose the language to display:
+        chi:  Chinese
+        kor:  Korean
+        jap:  Japanese
+        viet: Vietnamese
+        eng:  English
+        """
         return self._table[self.year_in_cicle][lang]
 
-    def _get_year(self):
+    @staticmethod
+    def _get_year():
         # from wikipedia (http://en.wikipedia.org/wiki/Sexagenary_cycle)
-        table = u"""\ 
+        table = u"""\
         1	甲子	jiǎ-zǐ	gapja 갑자	kōshi(kasshi)/kinoe-ne	Giáp Tý	Yang Wood Rat	4	57	1984
         2	乙丑	yǐ-chǒu	eulchuk 을축	itchū/kinoto-ushi	Ất Sửu	Yin Wood Ox	5	56	1985
         3	丙寅	bǐng-yín	byeongin 병인	heiin/hinoe-tora	Bính Dần	Yang Fire Tiger	6	55	1986
@@ -85,15 +109,22 @@ class LunarYear(object):
         lunar_table = {}
         for line in table.split('\n'):
             try:
-                lunar_year, hanja, chi, kor, jap, viet, eng, ad, bc, curr = line.strip().split('\t')
-                lunar_table[lunar_year] = {'chi': [chi, hanja], 'kor': [kor, hanja], 'jap': [jap, hanja], 'viet': [viet, hanja], 'eng': [eng, hanja], 'curr': curr}
+                year_order, hanja, chi, kor, jap, viet, eng, _, _, curr = line.strip().split('\t')
+                lunar_table[year_order] = {
+                    'chi': [chi, hanja],
+                    'kor': [kor, hanja],
+                    'jap': [jap, hanja],
+                    'viet': [viet, hanja],
+                    'eng': [eng, hanja],
+                    'curr': curr}
             except ValueError:
                 pass
-        
+
         return lunar_table
 
 if __name__ == '__main__':
     import sys
-    year, language = sys.argv[1:]
-    l = LunarYear(year)
-    print '\t'.join(l.lang(language))
+    YEAR = sys.argv[1]
+    LANGUAGE = sys.argv[2]
+    LUNAR_YEAR = LunarYear(YEAR)
+    print('\t'.join(LUNAR_YEAR.lang(LANGUAGE)))
