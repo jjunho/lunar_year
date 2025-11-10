@@ -1,5 +1,5 @@
-#! /usr/bin/python
-#encoding: utf-8
+#!/usr/bin/env python3
+# encoding: utf-8
 """
 module lunar.py
 
@@ -15,21 +15,61 @@ python lunar.py [gregorian year] [language]
 [language] as chi, kor, jap, viet, eng
 """
 
-class LunarYear(object):
+from typing import Dict, List
+import argparse
+import sys
+
+
+class LunarYear:
     """
     Builds a Lunar Year table with the years' names in
     Chinese, Korean, Japanese, Vietnamese and English.
     """
-    def __init__(self, gregorian_year):
+    
+    # Supported languages for lunar year display
+    SUPPORTED_LANGUAGES = {'chi', 'kor', 'jap', 'viet', 'eng'}
+    
+    # Valid year range for the sexagenary cycle calculation
+    MIN_YEAR = 4  # First year in the cycle
+    MAX_YEAR = 9999  # Practical upper limit
+    
+    # Class-level table loaded once
+    _TABLE = None
+    
+    def __init__(self, gregorian_year: int) -> None:
         """
-        Instantiate the class with a Gregorian year
+        Instantiate the class with a Gregorian year.
+        
+        Args:
+            gregorian_year: A Gregorian calendar year (integer)
+            
+        Raises:
+            ValueError: If year is outside valid range
+            TypeError: If year is not an integer
         """
-        # from wikipedia (http://en.wikipedia.org/wiki/Sexagenary_cycle)
-        self.solar_year = str(gregorian_year)
-        self.year_in_cicle = str(int(gregorian_year) - (60 * (int(gregorian_year) - 3) // 60))
-        self._table = LunarYear._get_year()
+        # Normalize to int
+        try:
+            gregorian_year = int(gregorian_year)
+        except (ValueError, TypeError) as e:
+            raise TypeError(f"Year must be an integer, got {type(gregorian_year).__name__}") from e
+        
+        # Validate range
+        if not self.MIN_YEAR <= gregorian_year <= self.MAX_YEAR:
+            raise ValueError(
+                f"Year must be between {self.MIN_YEAR} and {self.MAX_YEAR}, got {gregorian_year}"
+            )
+        
+        self.gregorian_year = gregorian_year
+        
+        # Calculate position in 60-year cycle (1-60)
+        # Formula from Wikipedia (http://en.wikipedia.org/wiki/Sexagenary_cycle)
+        self.year_in_cycle = ((gregorian_year - 4) % 60) + 1
+        
+        # Load table once at class level
+        if LunarYear._TABLE is None:
+            LunarYear._TABLE = self._get_year()
 
-    def lang(self, lang):
+    def lang(self, lang: str) -> List[str]:
         """
         Choose the language to display:
         chi:  Chinese
@@ -37,11 +77,31 @@ class LunarYear(object):
         jap:  Japanese
         viet: Vietnamese
         eng:  English
+        
+        Args:
+            lang: Language code (chi, kor, jap, viet, or eng)
+            
+        Returns:
+            List containing [language_name, hanja_characters]
+            
+        Raises:
+            ValueError: If language is not supported
         """
-        return self._table[self.year_in_cicle][lang]
+        if lang not in self.SUPPORTED_LANGUAGES:
+            raise ValueError(
+                f"Language '{lang}' not supported. Choose from: {', '.join(sorted(self.SUPPORTED_LANGUAGES))}"
+            )
+        
+        return self._TABLE[self.year_in_cycle][lang]
 
     @staticmethod
-    def _get_year():
+    def _get_year() -> Dict[int, Dict[str, List[str]]]:
+        """
+        Parse the sexagenary cycle table and return a dictionary.
+        
+        Returns:
+            Dictionary mapping cycle position to language-specific year names
+        """
         # from wikipedia (http://en.wikipedia.org/wiki/Sexagenary_cycle)
         table = u"""\
         1	甲子	jiǎ-zǐ	gapja 갑자	kōshi(kasshi)/kinoe-ne	Giáp Tý	Yang Wood Rat	4	57	1984
@@ -109,22 +169,63 @@ class LunarYear(object):
         lunar_table = {}
         for line in table.split('\n'):
             try:
-                year_order, hanja, chi, kor, jap, viet, eng, _, _, curr = line.strip().split('\t')
+                parts = line.strip().split('\t')
+                year_order = int(parts[0])
+                hanja = parts[1]
+                
+                # Build entry with shared hanja (DRY principle)
                 lunar_table[year_order] = {
-                    'chi': [chi, hanja],
-                    'kor': [kor, hanja],
-                    'jap': [jap, hanja],
-                    'viet': [viet, hanja],
-                    'eng': [eng, hanja],
-                    'curr': curr}
-            except ValueError:
+                    'chi': [parts[2], hanja],
+                    'kor': [parts[3], hanja],
+                    'jap': [parts[4], hanja],
+                    'viet': [parts[5], hanja],
+                    'eng': [parts[6], hanja]
+                }
+            except (ValueError, IndexError):
                 pass
 
         return lunar_table
 
+
+def main() -> None:
+    """
+    Main entry point for the command-line interface.
+    """
+    parser = argparse.ArgumentParser(
+        description='Calculate lunar year from Gregorian year and display in various languages.',
+        epilog='Example: %(prog)s 2024 chi'
+    )
+    
+    parser.add_argument(
+        'year',
+        type=int,
+        help=f'Gregorian year ({LunarYear.MIN_YEAR}-{LunarYear.MAX_YEAR})'
+    )
+    
+    parser.add_argument(
+        'language',
+        choices=sorted(LunarYear.SUPPORTED_LANGUAGES),
+        help='Language for output (chi=Chinese, kor=Korean, jap=Japanese, viet=Vietnamese, eng=English)'
+    )
+    
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='%(prog)s 1.0'
+    )
+    
+    try:
+        args = parser.parse_args()
+        lunar_year = LunarYear(args.year)
+        result = lunar_year.lang(args.language)
+        print('\t'.join(result))
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        sys.exit(2)
+
+
 if __name__ == '__main__':
-    import sys
-    YEAR = sys.argv[1]
-    LANGUAGE = sys.argv[2]
-    LUNAR_YEAR = LunarYear(YEAR)
-    print('\t'.join(LUNAR_YEAR.lang(LANGUAGE)))
+    main()
